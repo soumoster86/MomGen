@@ -1,4 +1,5 @@
 from docx import Document
+from io import BytesIO
 
 def create_doc(title, datetime_str, participants, mom):
 
@@ -12,9 +13,8 @@ def create_doc(title, datetime_str, participants, mom):
     doc.add_paragraph(f"Date & Time: {datetime_str}")
 
     doc.add_paragraph("Participants:")
-    participants_list = [p.strip() for p in participants.split(",")]
-    for p in participants_list:
-        doc.add_paragraph(p, style="List Bullet")
+    for p in participants.split(","):
+        doc.add_paragraph(p.strip(), style="List Bullet")
 
     # Summary
     doc.add_heading("Summary", 1)
@@ -30,14 +30,23 @@ def create_doc(title, datetime_str, participants, mom):
     for r in mom.get("risks", []):
         doc.add_paragraph(r, style="List Bullet")
 
-    # Actions
+    # Action Table
     doc.add_heading("Action Items", 1)
+
+    table = doc.add_table(rows=1, cols=3)
+    table.rows[0].cells[0].text = "Task"
+    table.rows[0].cells[1].text = "Owner"
+    table.rows[0].cells[2].text = "Deadline"
+
     for a in mom.get("actions", []):
-        doc.add_paragraph(
-            f"{a.get('task')} | Owner: {a.get('owner')} | Deadline: {a.get('deadline')}"
-        )
+        row = table.add_row().cells
+        row[0].text = a.get("task", "")
+        row[1].text = a.get("owner", "TBD")
+        row[2].text = a.get("deadline", "TBD")
 
-    file_path = "MOM_Output.docx"
-    doc.save(file_path)
+    # Save in memory
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
 
-    return file_path
+    return buffer

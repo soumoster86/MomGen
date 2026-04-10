@@ -1,79 +1,84 @@
 import streamlit as st
 from utils import extract_text
-from ai_handler import generate_mom
+from ai_handler import generate_mom, analyze_notes
 from doc_generator import create_doc
 
 st.set_page_config(page_title="MOM Generator", layout="wide")
 
-st.title("📄 Smart MOM Generator")
+st.title("📄 AI-Powered MOM Generator")
+st.caption("Convert raw meeting notes into structured Minutes of Meeting (MoM) using AI")
 
-# ---------------- Sidebar Progress ----------------
-st.sidebar.header("📊 Progress Tracker")
-
+# ---------------- SIDEBAR ----------------
+st.sidebar.header("📊 Completion Status")
 progress = 0
 
-# ---------------- Inputs ----------------
+# ---------------- MEETING DETAILS ----------------
 st.subheader("📝 Meeting Details")
 
-with st.expander("ℹ️ What should I enter here?"):
-    st.markdown("""
-    - **Meeting Title**: Name of meeting  
-    - **Participants**: Comma-separated names  
-    - **Date & Time**: When meeting occurred  
-    """)
+st.markdown("Provide basic meeting information to generate a complete MOM.")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    meeting_title = st.text_input("Meeting Title", help="Enter clear meeting name")
-    meeting_date = st.date_input("Meeting Date")
-
-with col2:
-    meeting_time = st.time_input("Meeting Time")
-    participants = st.text_area(
-        "Participants",
-        placeholder="John, Jane, Client A",
-        help="Comma-separated participants"
+    meeting_title = st.text_input(
+        "Meeting Title",
+        help="Enter a clear and descriptive name (e.g., Sprint Planning, Client Review)"
     )
 
-# ---------------- File Upload ----------------
+    meeting_date = st.date_input(
+        "Meeting Date",
+        help="Select the date when the meeting occurred"
+    )
+
+with col2:
+    meeting_time = st.time_input(
+        "Meeting Time",
+        help="Select the start time of the meeting"
+    )
+
+    participants = st.text_area(
+        "Participants",
+        placeholder="e.g., John Doe, Jane Smith, Client A",
+        help="Enter participant names separated by commas"
+    )
+
+# ---------------- FILE UPLOAD ----------------
 st.subheader("📂 Upload Meeting Notes")
 
-with st.expander("💡 Tips for better results"):
-    st.markdown("""
-    - Provide structured notes  
-    - Include decisions, risks, actions  
-    - Avoid random text dumps  
-    """)
+st.markdown("Upload your raw meeting notes or paste them manually below.")
 
 uploaded_file = st.file_uploader(
-    "Upload .txt or .docx",
-    type=["txt", "docx"]
+    "Upload Notes (.txt or .docx)",
+    type=["txt", "docx"],
+    help="Supported formats: .txt and .docx"
 )
 
 extracted_text = ""
 
 if uploaded_file:
     extracted_text = extract_text(uploaded_file)
-    st.success("File processed successfully")
+    st.success("✅ File uploaded and processed successfully")
 
-    with st.expander("Preview Extracted Text"):
+    with st.expander("📄 Preview Extracted Notes"):
         st.write(extracted_text[:1500])
 
-# ---------------- Manual Input ----------------
+# ---------------- MANUAL INPUT ----------------
 manual_notes = st.text_area(
     "✍️ Or Enter Notes Manually",
     height=200,
     placeholder="""
-- Discussed timeline delays
-- Client requested new features
-- Action: John to send update
-"""
+Example:
+- Discussed delays in delivery timeline
+- Client requested additional features
+- Decision: Phase 1 delivery by next Friday
+- Action: John to update project plan
+""",
+    help="Provide structured notes including decisions, risks, and actions for best results"
 )
 
 notes = extracted_text if extracted_text else manual_notes
 
-# ---------------- Progress ----------------
+# ---------------- PROGRESS ----------------
 if meeting_title:
     progress += 25
 if participants:
@@ -82,43 +87,58 @@ if notes:
     progress += 50
 
 st.sidebar.progress(progress / 100)
-st.sidebar.write(f"Completion: {progress}%")
+st.sidebar.write(f"{progress}% Complete")
 
-# ---------------- Validation ----------------
-def validate():
-    if not meeting_title:
-        return "Enter meeting title"
-    if not participants:
-        return "Enter participants"
-    if not notes:
-        return "Provide meeting notes"
-    return None
+# ---------------- AI FEEDBACK ----------------
+if notes:
+    try:
+        feedback = analyze_notes(notes)
 
-# ---------------- Generate ----------------
+        if not feedback.get("is_complete", True):
+            st.warning("⚠️ Your notes may be incomplete")
+
+            with st.expander("💡 Suggestions to Improve Input"):
+                for issue in feedback.get("issues", []):
+                    st.write(f"❌ {issue}")
+                for suggestion in feedback.get("suggestions", []):
+                    st.write(f"💡 {suggestion}")
+    except:
+        pass
+
+# ---------------- GENERATE ----------------
 st.markdown("---")
 
-st.info("💡 Better notes = better MOM output")
+st.info("💡 Tip: Better structured notes → More accurate MOM output")
 
-if st.button("🚀 Generate MOM"):
+if st.button(
+    "🚀 Generate MOM",
+    help="Click to generate a structured MOM document using AI"
+):
 
-    error = validate()
+    if not meeting_title:
+        st.error("Meeting Title is required")
+        st.stop()
 
-    if error:
-        st.error(error)
+    if not participants:
+        st.error("Participants are required")
+        st.stop()
+
+    if not notes:
+        st.error("Please provide meeting notes")
         st.stop()
 
     meeting_datetime = f"{meeting_date} {meeting_time}"
 
     with st.spinner("Generating MOM..."):
-        mom = generate_mom(notes)
+        mom = generate_mom(notes, participants)
 
     if not mom:
-        st.error("AI failed to generate MOM")
+        st.error("AI failed to generate MOM. Try improving your notes.")
         st.stop()
 
-    st.success("MOM Generated Successfully!")
+    st.success("✅ MOM Generated Successfully")
 
-    # ---------------- Preview ----------------
+    # ---------------- PREVIEW ----------------
     st.subheader("📊 MOM Preview")
 
     st.write("### 📌 Meeting Details")
@@ -131,32 +151,32 @@ if st.button("🚀 Generate MOM"):
     st.write("### Summary")
     st.write(mom.get("summary"))
 
-    st.write("### Decisions")
+    st.write("### Key Decisions")
     for d in mom.get("decisions", []):
         st.write(f"- {d}")
 
-    st.write("### Risks")
+    st.write("### Risks & Issues")
     for r in mom.get("risks", []):
         st.write(f"- {r}")
 
-    st.write("### Actions")
+    st.write("### Action Items")
     for a in mom.get("actions", []):
         st.write(
             f"- {a.get('task')} (Owner: {a.get('owner')}, Deadline: {a.get('deadline')})"
         )
 
-    # ---------------- Download ----------------
-    file_path = create_doc(
+    # ---------------- DOWNLOAD ----------------
+    buffer = create_doc(
         meeting_title,
         meeting_datetime,
         participants,
         mom
     )
 
-    with open(file_path, "rb") as file:
-        st.download_button(
-            "📥 Download MOM",
-            file,
-            file_name="MOM.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+    st.download_button(
+        "📥 Download MOM (Word)",
+        buffer,
+        file_name="MOM.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        help="Download the generated MOM as a Word document"
+    )
