@@ -1,6 +1,5 @@
 from docx import Document
 
-# Optional spaCy (graceful fallback)
 try:
     import spacy
     nlp = spacy.load("en_core_web_sm")
@@ -11,15 +10,12 @@ except:
 
 def extract_text(uploaded_file):
     text = ""
-
     if uploaded_file.name.endswith(".txt"):
         text = uploaded_file.read().decode("utf-8")
-
     elif uploaded_file.name.endswith(".docx"):
         doc = Document(uploaded_file)
         for para in doc.paragraphs:
             text += para.text + "\n"
-
     return " ".join(text.split())
 
 
@@ -28,9 +24,7 @@ def extract_entities(text):
         return [], []
 
     doc = nlp(text)
-
-    names = []
-    dates = []
+    names, dates = [], []
 
     for ent in doc.ents:
         if ent.label_ == "PERSON":

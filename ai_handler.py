@@ -1,16 +1,22 @@
-import os
 import json
 import re
-from dotenv import load_dotenv
 from openai import OpenAI
 from utils import extract_entities
+from dotenv import load_dotenv
+
+import os
 
 load_dotenv()
-client = OpenAI()
+
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    raise ValueError("OPENAI_API_KEY is not set. Check your .env file")
+
+from openai import OpenAI
+client = OpenAI(api_key=api_key)
 
 MODEL = "gpt-4o-mini"
-MAX_RETRIES = 2
-
 
 def clean_json(text):
     text = re.sub(r"```json|```", "", text)
@@ -19,81 +25,62 @@ def clean_json(text):
 
 
 def validate_mom(data):
-    keys = ["summary", "decisions", "risks", "actions"]
-    return isinstance(data, dict) and all(k in data for k in keys)
+    return isinstance(data, dict) and all(k in data for k in ["summary", "decisions", "risks", "actions"])
 
 
-def build_prompt(notes, participants, names, dates):
+def build_prompt(notes, participants, names, dates, meeting_type):
     return f"""
 You are a Senior IT Project Manager.
 
+Meeting Type: {meeting_type}
 Participants: {participants}
 Detected Names: {names}
 Detected Dates: {dates}
 
-TASK:
 Convert notes into structured MOM.
-
-RULES:
-- Assign owners from names if possible
-- Infer deadlines from dates
-- Use "TBD" if missing
-- Return ONLY JSON
+Return ONLY JSON.
 
 FORMAT:
 {{
  "summary": "",
  "decisions": [],
  "risks": [],
- "actions": [
-   {{"task": "", "owner": "", "deadline": ""}}
- ]
+ "actions": [{{"task": "", "owner": "", "deadline": ""}}]
 }}
 
-NOTES:
+Notes:
 {notes}
 """
 
 
-def generate_mom(notes, participants):
-
+def generate_mom(notes, participants, meeting_type):
     names, dates = extract_entities(notes)
-    prompt = build_prompt(notes, participants, names, dates)
+    prompt = build_prompt(notes, participants, names, dates, meeting_type)
 
-    for _ in range(MAX_RETRIES):
-        try:
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.2
-            )
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+        temperature=0.2
+    )
 
-            content = response.choices[0].message.content.strip()
+    content = response.choices[0].message.content.strip()
 
-            try:
-                data = json.loads(content)
-            except:
-                data = json.loads(clean_json(content))
+    try:
+        data = json.loads(content)
+    except:
+        data = json.loads(clean_json(content))
 
-            if validate_mom(data):
-                return data
-
-        except Exception as e:
-            print("ERROR:", e)
-
-    return None
+    return data if validate_mom(data) else None
 
 
-# -------- AI FEEDBACK LOOP --------
 def analyze_notes(notes):
-
     prompt = f"""
 Evaluate meeting notes quality.
 
 Return JSON:
 {{
- "is_complete": true/false,
+ "is_complete": true,
  "issues": [],
  "suggestions": []
 }}

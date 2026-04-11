@@ -1,0 +1,299 @@
+[
+  {
+    "title": "Meeting related to Funcional Use case test",
+    "datetime": "2026-04-10 15:30:00",
+    "mom": {
+      "summary": "Discussion on leveraging AI in project management and aligning all Project Managers to incorporate AI into their daily work.",
+      "decisions": [
+        ""
+      ],
+      "risks": [
+        "Finding suitable time for all the project managers to brainstorm ideas."
+      ],
+      "actions": [
+        {
+          "task": "Update JIRA",
+          "owner": "Souma",
+          "deadline": "today"
+        },
+        {
+          "task": "Setup a new meeting with Client",
+          "owner": "Alex",
+          "deadline": "next week"
+        },
+        {
+          "task": "Setup the JIRA plan",
+          "owner": "Manas",
+          "deadline": "end of next week"
+        },
+        {
+          "task": "Document the MOM notes",
+          "owner": "Sankhadip",
+          "deadline": ""
+        },
+        {
+          "task": "Analyze AI ideas",
+          "owner": "Suprateek",
+          "deadline": "14-April"
+        },
+        {
+          "task": "Check the progress",
+          "owner": "Souma",
+          "deadline": "next week around same time"
+        }
+      ]
+    }
+  },
+  {
+    "title": "hardware procurement decision",
+    "mom": {
+      "summary": "Network Refresh project is on hold without hardware purchase.",
+      "decisions": [
+        "Need to progress with hardware purchase soon."
+      ],
+      "risks": [
+        "Any delay in procuring hardware by end of April will delay the project completion."
+      ],
+      "actions": [
+        {
+          "task": "Check with Anders on PO request.",
+          "owner": "Souma",
+          "deadline": "today"
+        },
+        {
+          "task": "Check with Procurement team on whether PO has been placed.",
+          "owner": "Anders",
+          "deadline": ""
+        },
+        {
+          "task": "Check if matching hardware is being purchased.",
+          "owner": "Kim",
+          "deadline": "14-April"
+        },
+        {
+          "task": "Schedule a next round of meeting.",
+          "owner": "Alex",
+          "deadline": "next week"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-10 13:45:00",
+    "mom": {
+      "summary": "Hardware procurement should be prioritized and completed by the end of April.",
+      "decisions": [
+        "Hardware procurement should be a top priority."
+      ],
+      "risks": [
+        "Hardware needs to be procured quickly else the deadline will get extended, leading to increased project costs."
+      ],
+      "actions": [
+        {
+          "task": "Setup a call with Anders",
+          "owner": "Souma",
+          "deadline": "next week"
+        },
+        {
+          "task": "Get details of PO from procurement team",
+          "owner": "Anders",
+          "deadline": ""
+        },
+        {
+          "task": "Check if hardware details are correct",
+          "owner": "Kim",
+          "deadline": ""
+        },
+        {
+          "task": "Setup a meeting for progress",
+          "owner": "Alex",
+          "deadline": "next week"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-10 13:45:00",
+    "mom": {
+      "summary": "Hardware procurement should be prioritized and completed by the end of April.",
+      "decisions": [
+        "Hardware procurement should be a top priority."
+      ],
+      "risks": [
+        "Hardware needs to be procured quickly else the deadline will get extended, leading to increased project costs."
+      ],
+      "actions": [
+        {
+          "task": "Setup a call with Anders",
+          "owner": "Souma",
+          "deadline": "next week"
+        },
+        {
+          "task": "Get details of PO from procurement team",
+          "owner": "Anders",
+          "deadline": ""
+        },
+        {
+          "task": "Check if hardware details are correct",
+          "owner": "Kim",
+          "deadline": ""
+        },
+        {
+          "task": "Setup a meeting for progress",
+          "owner": "Alex",
+          "deadline": "next week"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-11 12:10:00",
+    "mom": {
+      "summary": "List of ideas where AI can be invoked. Need to brainstorm every week to find new ideas.",
+      "decisions": [
+        "Need to see if AI can be invoked more often in Projects"
+      ],
+      "risks": [],
+      "actions": [
+        {
+          "task": "Show a demo of AI powered solution",
+          "owner": "Souma",
+          "deadline": "14-April"
+        },
+        {
+          "task": "List down all the possible AI ideas",
+          "owner": "Alex",
+          "deadline": "next week"
+        },
+        {
+          "task": "Create a JIRA task",
+          "owner": "Suprateek",
+          "deadline": "15-April"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-11 12:10:00",
+    "mom": {
+      "summary": "List of ideas where AI can be invoked. Need to brainstorm every week to find new ideas.",
+      "decisions": [
+        "Need to see if AI can be invoked more often in Projects"
+      ],
+      "risks": [
+        "Without showcasing AI in project work, manual repetetive work can get increased."
+      ],
+      "actions": [
+        {
+          "task": "Show a demo of AI powered solution",
+          "owner": "Souma",
+          "deadline": "14-April"
+        },
+        {
+          "task": "List down all the possible AI ideas",
+          "owner": "Alex",
+          "deadline": "next week"
+        },
+        {
+          "task": "Create a JIRA task",
+          "owner": "Suprateek",
+          "deadline": "15-April"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-11 12:10:00",
+    "mom": {
+      "summary": "List of ideas where AI can be invoked. Need to brainstorm every week to find new ideas.",
+      "decisions": [
+        "Need to see if AI can be invoked more often in Projects"
+      ],
+      "risks": [
+        "Without showcasing AI in project work, manual repetetive work can get increased."
+      ],
+      "actions": [
+        {
+          "task": "Show a demo of AI powered solution",
+          "owner": "Souma",
+          "deadline": "14-April"
+        },
+        {
+          "task": "List down all the possible AI ideas",
+          "owner": "Alex",
+          "deadline": "16-April"
+        },
+        {
+          "task": "Create a JIRA task",
+          "owner": "Suprateek",
+          "deadline": "15-April"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-11 12:10:00",
+    "mom": {
+      "summary": "List of ideas where AI can be invoked. Need to brainstorm every week to find new ideas.",
+      "decisions": [
+        "Need to see if AI can be invoked more often in Projects"
+      ],
+      "risks": [
+        "Without showcasing AI in project work, manual repetetive work can get increased."
+      ],
+      "actions": [
+        {
+          "task": "Show a demo of AI powered solution",
+          "owner": "Souma",
+          "deadline": "14-April"
+        },
+        {
+          "task": "List down all the possible AI ideas",
+          "owner": "Alex",
+          "deadline": "16-April"
+        },
+        {
+          "task": "Create a JIRA task",
+          "owner": "Suprateek",
+          "deadline": "15-April"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Use of AI in Project Management",
+    "datetime": "2026-04-11 12:10:00",
+    "mom": {
+      "summary": "List of ideas where AI can be invoked. Need to brainstorm every week to find new ideas.",
+      "decisions": [
+        "Need to see if AI can be invoked more often in Projects"
+      ],
+      "risks": [
+        "Without showcasing AI in project work, manual repetetive work can get increased."
+      ],
+      "actions": [
+        {
+          "task": "Show a demo of AI powered solution",
+          "owner": "Souma",
+          "deadline": "14-April"
+        },
+        {
+          "task": "List down all the possible AI ideas",
+          "owner": "Alex",
+          "deadline": "16-April"
+        },
+        {
+          "task": "Create a JIRA task",
+          "owner": "Suprateek",
+          "deadline": "15-April"
+        }
+      ]
+    }
+  }
+]
