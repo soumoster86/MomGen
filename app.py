@@ -273,20 +273,157 @@ if page == "MOM Generator":
 
 
 # ===============================
-# ANALYTICS
+# ANALYTICS DASHBOARD (UPGRADED)
 # ===============================
 if page == "Analytics":
 
-    st.title("📊 Analytics Dashboard")
+    import pandas as pd
+    from collections import Counter
+    from datetime import datetime
+
+    st.title("📊 Advanced Analytics Dashboard")
+    st.caption("Insights across meetings, actions, risks, and team productivity")
 
     data = load_history()
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Meetings", len(data))
-    col2.metric("Total Actions", sum(len(m["mom"]["actions"]) for m in data))
-    col3.metric("Total Risks", sum(len(m["mom"]["risks"]) for m in data))
+    if not data:
+        st.warning("No data available yet. Generate some MOMs first.")
+        st.stop()
 
-    st.subheader("Recent Meetings")
+    # ---------------- CLEAN DATA ----------------
+    seen = set()
+    unique_data = []
+
+    for m in data:
+        key = (m.get("title"), m.get("datetime"))
+        if key not in seen:
+            seen.add(key)
+            unique_data.append(m)
+
+    data = unique_data
+
+    # ---------------- TOP METRICS ----------------
+    total_meetings = len(data)
+    total_actions = sum(len(m["mom"]["actions"]) for m in data)
+    total_risks = sum(len(m["mom"]["risks"]) for m in data)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("📅 Total Meetings", total_meetings)
+    col2.metric("✅ Total Actions", total_actions)
+    col3.metric("⚠️ Total Risks", total_risks)
+
+    st.markdown("---")
+
+    # ---------------- TREND ----------------
+    st.subheader("📈 Meetings Trend Over Time")
+
+    df = pd.DataFrame(data)
+
+    if "datetime" in df.columns:
+        df["date"] = pd.to_datetime(df["datetime"], errors="coerce")
+        trend = df.groupby(df["date"].dt.date).size()
+
+        st.line_chart(trend)
+    else:
+        st.info("No date data available")
+
+    # ---------------- OWNER ANALYSIS ----------------
+    st.subheader("👤 Actions by Owner")
+
+    owners = []
+    for m in data:
+        for a in m["mom"]["actions"]:
+            if a.get("owner"):
+                owners.append(a["owner"])
+
+    if owners:
+        owner_count = Counter(owners)
+        owner_df = pd.DataFrame(owner_count.items(), columns=["Owner", "Tasks"])
+        owner_df = owner_df.sort_values(by="Tasks", ascending=False)
+
+        st.bar_chart(owner_df.set_index("Owner"))
+    else:
+        st.info("No owner data available")
+
+    # ---------------- DEADLINE INSIGHTS ----------------
+    st.subheader("⏱️ Deadline Insights")
+
+    overdue = 0
+    upcoming = 0
+    no_deadline = 0
+
+    for m in data:
+        for a in m["mom"]["actions"]:
+            d = str(a.get("deadline", "")).lower()
+
+            if not d.strip():
+                no_deadline += 1
+            elif "today" in d:
+                overdue += 1
+            elif "next" in d or "week" in d:
+                upcoming += 1
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🔴 Overdue", overdue)
+    c2.metric("🟡 Upcoming", upcoming)
+    c3.metric("⚪ No Deadline", no_deadline)
+
+    # ---------------- RISK ANALYSIS ----------------
+    st.subheader("⚠️ Risk Distribution per Meeting")
+
+    risk_counts = []
+    titles = []
+
+    for m in data:
+        risk_counts.append(len(m["mom"]["risks"]))
+        titles.append(m["title"])
+
+    risk_df = pd.DataFrame({
+        "Meeting": titles,
+        "Risks": risk_counts
+    })
+
+    st.bar_chart(risk_df.set_index("Meeting"))
+
+    # ---------------- ACTION TABLE ----------------
+    st.subheader("📋 Action Tracker")
+
+    rows = []
+
+    for m in data:
+        for a in m["mom"]["actions"]:
+            rows.append({
+                "Meeting": m.get("title"),
+                "Owner": a.get("owner"),
+                "Task": a.get("task"),
+                "Deadline": a.get("deadline")
+            })
+
+    action_df = pd.DataFrame(rows)
+
+    if not action_df.empty:
+        st.dataframe(action_df, use_container_width=True)
+    else:
+        st.info("No actions available")
+
+    # ---------------- SEARCH ----------------
+    st.subheader("🔍 Search Meetings")
+
+    search = st.text_input("Search by Meeting Title")
+
+    if search:
+        filtered = [m for m in data if search.lower() in m["title"].lower()]
+
+        if filtered:
+            for m in filtered:
+                st.write(f"📌 {m['title']} - {m.get('datetime', 'N/A')}")
+        else:
+            st.warning("No matching meetings found")
+
+    st.markdown("---")
+
+    # ---------------- RECENT ----------------
+    st.subheader("🕒 Recent Meetings")
 
     for m in reversed(data[-5:]):
-        st.write(f"{m['title']} - {m['datetime']}")
+        st.write(f"📌 {m['title']} - {m.get('datetime', 'N/A')}")
