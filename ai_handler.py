@@ -287,15 +287,21 @@ def generate_mom(
 
 def build_analysis_prompt(notes):
     return f"""
-Evaluate the quality of these meeting notes.
+Evaluate the quality of these meeting notes against five criteria.
 
 Notes:
 {notes}
 
-Return ONLY valid JSON:
+Return ONLY valid JSON in this exact format:
 
 {{
-    "is_complete": true,
+    "criteria": {{
+        "has_decisions": true,
+        "has_actions": true,
+        "has_owners": true,
+        "has_deadlines": true,
+        "has_risks": true
+    }},
     "issues": [
         "Issue 1"
     ],
@@ -304,14 +310,18 @@ Return ONLY valid JSON:
     ]
 }}
 
-Evaluation Criteria:
-- Presence of decisions
-- Presence of actions
-- Presence of owners
-- Presence of deadlines
-- Presence of risks
+Rules for the criteria flags — be strict:
+- "has_decisions": true only if at least one explicit decision is stated
+- "has_actions": true only if at least one concrete action item is stated
+- "has_owners": true only if EVERY action item has a named owner
+- "has_deadlines": true only if EVERY action item has a SPECIFIC deadline
+  (a date or day). Vague phrases like "soon", "next week", or
+  "middle of next week" count as false.
+- "has_risks": true only if at least one risk or blocker is mentioned
 
-Suggestions should help improve MOM quality.
+For every criterion that is false, add a matching entry to "issues"
+explaining what is missing. Use "suggestions" only for optional
+improvements beyond the five criteria (e.g., adding context).
 """
 
 
@@ -342,12 +352,32 @@ def analyze_notes(notes):
 
         content = response.choices[0].message.content
 
-        return json.loads(content)
+        data = json.loads(content)
+
+        # Guarantee the criteria block exists with strict defaults
+        criteria = data.get("criteria", {})
+        data["criteria"] = {
+            "has_decisions": bool(criteria.get("has_decisions", False)),
+            "has_actions": bool(criteria.get("has_actions", False)),
+            "has_owners": bool(criteria.get("has_owners", False)),
+            "has_deadlines": bool(criteria.get("has_deadlines", False)),
+            "has_risks": bool(criteria.get("has_risks", False)),
+        }
+        data.setdefault("issues", [])
+        data.setdefault("suggestions", [])
+
+        return data
 
     except Exception as e:
 
         return {
-            "is_complete": False,
+            "criteria": {
+                "has_decisions": False,
+                "has_actions": False,
+                "has_owners": False,
+                "has_deadlines": False,
+                "has_risks": False,
+            },
             "issues": [
                 f"Analysis failed: {str(e)}"
             ],

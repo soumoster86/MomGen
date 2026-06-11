@@ -58,18 +58,26 @@ def update_record(record_id, updates):
 
 
 # ==========================================
-# SCORE
+# SCORE — deterministic rubric
 # ==========================================
+# The LLM only reports WHICH criteria are present (easy, reliable
+# classification). The score itself is computed here, in code, so the
+# same notes always get the same grade.
+CRITERIA_RUBRIC = [
+    ("has_decisions", "Decisions recorded", 25),
+    ("has_actions",   "Action items present", 25),
+    ("has_owners",    "Every action has an owner", 20),
+    ("has_deadlines", "Every action has a specific deadline", 20),
+    ("has_risks",     "Risks / blockers identified", 10),
+]
+
+
 def calculate_score(feedback):
-    score = 100
-
-    if not feedback.get("is_complete", True):
-        score -= 30
-
-    issues = feedback.get("issues", [])
-    score -= min(len(issues) * 10, 40)
-
-    return max(0, min(score, 100))
+    criteria = feedback.get("criteria", {})
+    return sum(
+        weight for key, _, weight in CRITERIA_RUBRIC
+        if criteria.get(key, False)
+    )
 
 
 def analysis_failed(feedback):
@@ -225,9 +233,18 @@ if page == "MOM Generator":
             if score >= 75:
                 st.success(f"Quality Score {score}/100 — good to generate")
             elif score >= 50:
-                st.warning(f"Quality Score {score}/100 — consider adding owners/deadlines")
+                st.warning(f"Quality Score {score}/100 — consider filling the gaps below")
             else:
                 st.error(f"Quality Score {score}/100 — notes are too thin for a good MOM")
+
+            # Per-criterion breakdown: exactly where points were won/lost
+            criteria = feedback.get("criteria", {})
+            check_cols = st.columns(len(CRITERIA_RUBRIC))
+            for col, (key, label, weight) in zip(check_cols, CRITERIA_RUBRIC):
+                passed = criteria.get(key, False)
+                icon = "✅" if passed else "❌"
+                pts = f"+{weight}" if passed else f"0/{weight}"
+                col.markdown(f"{icon} **{label}**  \n`{pts} pts`")
 
             issues = feedback.get("issues", [])
             suggestions = feedback.get("suggestions", [])
