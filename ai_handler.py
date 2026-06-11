@@ -1,113 +1,391 @@
 import json
 import re
+import os
+import traceback
 import streamlit as st
-from openai import OpenAI
+from dotenv import load_dotenv
+from openai import OpenAI, RateLimitError, APITimeoutError, InternalServerError, APIConnectionError
 from utils import extract_entities
 
-api_key = st.secrets.get("OPENAI_API_KEY")
+# ==========================================
+# CONFIGURATION
+# ==========================================
+
+load_dotenv()
+
+try:
+    api_key = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    api_key = os.getenv("OPENAI_API_KEY")
 
 if not api_key:
-    raise ValueError("OPENAI_API_KEY missing in Streamlit secrets")
+    raise ValueError(
+        "OPENAI_API_KEY not found. Configure either:\n"
+        "1. .env file (local)\n"
+        "2. Streamlit Secrets (cloud)"
+    )
 
 client = OpenAI(api_key=api_key)
 
 PRIMARY_MODEL = "gpt-4o-mini"
+
+# Fallback model if primary fails for transient reasons
 FALLBACK_MODEL = "gpt-4o"
 
+# Only these errors are worth retrying on a different model.
+# Auth errors, bad requests, quota issues, etc. would fail identically.
+TRANSIENT_ERRORS = (
+    RateLimitError,
+    APITimeoutError,
+    InternalServerError,
+    APIConnectionError,
+)
+
+
+# ==========================================
+# HELPERS
+# ==========================================
 
 def clean_json(text):
+    """
+    Extract valid JSON from model response
+    """
     text = re.sub(r"```json|```", "", text)
+
     match = re.search(r"\{.*\}", text, re.DOTALL)
-    return match.group(0) if match else text
+
+    if match:
+        return match.group(0)
+
+    return text
 
 
 def validate_mom(data):
-    return isinstance(data, dict) and all(
-        k in data for k in ["summary", "decisions", "risks", "actions"]
-    )
+    """
+    Validate the full MOM structure, not just top-level keys.
+
+    Required shape:
+    {
+      "summary":   str,
+      "decisions": [str, ...],
+      "risks":     [str, ...],
+      "actions":   [{"task": str, "owner": str, "deadline": str}, ...]
+    }
+    """
+    if not isinstance(data, dict):
+        return False
+
+    required_keys = ("summary", "decisions", "risks", "actions")
+    if not all(key in data for key in required_keys):
+        return False
+
+    if not isinstance(data["summary"], str):
+        return False
+
+    for key in ("decisions", "risks"):
+        if not isinstance(data[key], list):
+            return False
+        if not all(isinstance(item, str) for item in data[key]):
+            return False
+
+    if not isinstance(data["actions"], list):
+        return False
+
+    for action in data["actions"]:
+        if not isinstance(action, dict):
+            return False
+        if "task" not in action:
+            return False
+
+    return True
 
 
-def build_prompt(notes, participants, names, dates, meeting_type):
-    return (
-        "You are a Senior IT Project Manager.\n"
-        "Return ONLY valid JSON.\n"
-        "{\n"
-        '"summary": "",\n'
-        '"decisions": [],\n'
-        '"risks": [],\n'
-        '"actions": [{"task": "", "owner": "", "deadline": ""}]\n'
-        "}\n\n"
-        f"Meeting Type: {meeting_type}\n"
-        f"Participants: {participants}\n"
-        f"Names: {names}\n"
-        f"Dates: {dates}\n"
-        f"Notes: {notes}"
-    )
+def normalize_mom(data):
+    """
+    Coerce a validated MOM into a fully predictable shape so that
+    downstream code (doc_generator, analytics) never hits a missing
+    key or a None value.
+    """
+    normalized_actions = []
+    for action in data.get("actions", []):
+        normalized_actions.append({
+            "task": str(action.get("task", "") or "").strip(),
+            "owner": str(action.get("owner", "") or "TBD").strip() or "TBD",
+            "deadline": str(action.get("deadline", "") or "TBD").strip() or "TBD",
+        })
+
+    return {
+        "summary": str(data.get("summary", "")).strip(),
+        "decisions": [str(d).strip() for d in data.get("decisions", []) if str(d).strip()],
+        "risks": [str(r).strip() for r in data.get("risks", []) if str(r).strip()],
+        "actions": normalized_actions,
+    }
 
 
 def call_model(model, prompt):
+    """
+    Generic OpenAI call
+    """
+
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert IT Project Manager. "
+                    "Always return valid JSON."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
         response_format={"type": "json_object"},
-        temperature=0.2,
+        temperature=0.2
     )
+
     return response.choices[0].message.content.strip()
 
 
-def generate_mom(notes, participants, meeting_type):
-    try:
-        names, dates = extract_entities(notes)
-        prompt = build_prompt(notes, participants, names, dates, meeting_type)
+# ==========================================
+# MOM GENERATION
+# ==========================================
 
-        # -------- PRIMARY ATTEMPT --------
-        content = call_model(PRIMARY_MODEL, prompt)
+def build_mom_prompt(
+    notes,
+    participants,
+    names,
+    dates,
+    meeting_type,
+    meeting_date
+):
+    return f"""
+You are a Senior IT Project Manager.
+
+Generate professional Minutes of Meeting.
+
+Meeting Type:
+{meeting_type}
+
+Meeting Date (use this to resolve relative dates):
+{meeting_date}
+
+Participants:
+{participants}
+
+People Mentioned:
+{names}
+
+Dates Mentioned:
+{dates}
+
+Meeting Notes:
+{notes}
+
+Return ONLY valid JSON in this exact format:
+
+{{
+  "summary": "Meeting summary",
+  "decisions": [
+    "Decision 1"
+  ],
+  "risks": [
+    "Risk 1"
+  ],
+  "actions": [
+    {{
+      "task": "Action item",
+      "owner": "Owner Name",
+      "deadline": "YYYY-MM-DD"
+    }}
+  ]
+}}
+
+Rules:
+- Summary should be concise
+- Extract decisions explicitly
+- Identify risks and blockers
+- Create action items with owner and deadline
+- "decisions" and "risks" must be arrays of plain strings
+- Each action must be an object with exactly the keys: task, owner, deadline
+- ALL deadlines must be absolute dates in YYYY-MM-DD format
+- Resolve relative deadlines using the Meeting Date above:
+  * "today" -> the Meeting Date itself
+  * "tomorrow" -> Meeting Date + 1 day
+  * "next week" -> the Monday after the Meeting Date
+  * "end of next week" -> the Friday of the week after the Meeting Date
+  * "end of April" -> the last day of that month in the Meeting Date's year
+- Never output vague deadlines like "today", "next week", or "soon"
+- If owner is missing, use "TBD"
+- If no deadline is stated or it cannot be resolved, use "TBD"
+"""
+
+
+def generate_mom(
+    notes,
+    participants,
+    meeting_type,
+    meeting_date=""
+):
+    try:
+
+        names, dates = extract_entities(notes)
+
+        prompt = build_mom_prompt(
+            notes,
+            participants,
+            names,
+            dates,
+            meeting_type,
+            meeting_date
+        )
+
+        # -------------------------------
+        # PRIMARY ATTEMPT
+        # -------------------------------
+        # Fall back to the larger model only on transient errors.
+        # Anything else (auth, quota, bad request) would fail the
+        # same way and just waste a second round trip.
+
+        try:
+            content = call_model(
+                PRIMARY_MODEL,
+                prompt
+            )
+        except TRANSIENT_ERRORS:
+            content = call_model(
+                FALLBACK_MODEL,
+                prompt
+            )
 
         try:
             data = json.loads(content)
-        except:
+        except json.JSONDecodeError:
             data = json.loads(clean_json(content))
 
-        if validate_mom(data):
-            return data
+        if not validate_mom(data):
+            return {
+                "error": "AI returned invalid MOM structure",
+                "response": content
+            }
 
-        # -------- FALLBACK --------
-        content = call_model(FALLBACK_MODEL, prompt)
-        data = json.loads(clean_json(content))
-
-        if validate_mom(data):
-            return data
-
-        return {"error": "Invalid JSON structure from AI"}
+        return normalize_mom(data)
 
     except Exception as e:
-        import traceback
+
         return {
             "error": str(e),
             "trace": traceback.format_exc()
         }
 
 
+# ==========================================
+# NOTES ANALYSIS
+# ==========================================
+
+def build_analysis_prompt(notes):
+    return f"""
+Evaluate the quality of these meeting notes.
+
+Notes:
+{notes}
+
+Return ONLY valid JSON:
+
+{{
+    "is_complete": true,
+    "issues": [
+        "Issue 1"
+    ],
+    "suggestions": [
+        "Suggestion 1"
+    ]
+}}
+
+Evaluation Criteria:
+- Presence of decisions
+- Presence of actions
+- Presence of owners
+- Presence of deadlines
+- Presence of risks
+
+Suggestions should help improve MOM quality.
+"""
+
+
 def analyze_notes(notes):
+
     try:
-        prompt = (
-            "Evaluate meeting notes.\n"
-            "Return JSON with is_complete, issues, suggestions.\n"
-            f"Notes: {notes}"
-        )
+
+        prompt = build_analysis_prompt(notes)
 
         response = client.chat.completions.create(
             model=PRIMARY_MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You evaluate meeting notes and "
+                        "return only JSON."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
             response_format={"type": "json_object"},
-            temperature=0.2,
+            temperature=0.1
         )
 
-        return json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+
+        return json.loads(content)
 
     except Exception as e:
+
         return {
             "is_complete": False,
-            "issues": [str(e)],
-            "suggestions": []
+            "issues": [
+                f"Analysis failed: {str(e)}"
+            ],
+            "suggestions": [
+                "Check OpenAI API connectivity"
+            ]
+        }
+
+
+# ==========================================
+# CONNECTION TEST
+# ==========================================
+
+def test_openai_connection():
+    """
+    Useful for debugging
+    """
+
+    try:
+
+        response = client.chat.completions.create(
+            model=PRIMARY_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Reply with OK"
+                }
+            ]
+        )
+
+        return {
+            "success": True,
+            "message": response.choices[0].message.content
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "error": str(e)
         }
